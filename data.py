@@ -23,7 +23,7 @@ class COCO(data.Dataset):
 
         self.req_label = req_label
         if req_label:
-            self.label_path = os.join(root, "label", split)
+            self.label_path = os.join(root, "label2017", split)
 
         self.req_augment = req_augment
         self.crop_size = crop_size
