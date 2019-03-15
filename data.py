@@ -19,11 +19,11 @@ class COCO(data.Dataset):
         self.split = split
         self.image_path = os.path.join(root, split)
         self.id_to_filename = self._get_COCOid_to_filename()
-        self.ids = self.id_to_filename.keys()
+        self.ids = list(self.id_to_filename.keys())
 
         self.req_label = req_label
         if req_label:
-            self.label_path = os.join(root, "label2017", split)
+            self.label_path = os.path.join(root, "label2017", split)
 
         self.req_augment = req_augment
         self.crop_size = crop_size
@@ -83,7 +83,7 @@ class COCO(data.Dataset):
         
         if self.req_label:
             filename = filename.split('.')[0] + ".png"
-            label = cv2.imread(os.path.join(self.label_path, filename, cv2.IMREAD_GRAYSCALE))
+            label = cv2.imread(os.path.join(self.label_path, filename), cv2.IMREAD_GRAYSCALE)
         else:
             label = None
 
@@ -92,9 +92,7 @@ class COCO(data.Dataset):
     def __getitem__(self, index):
         image, label = self._load_data(index)
         image = cv2.resize(image, (448, 448), interpolation=cv2.INTER_LINEAR)
-        
-        label = None
-        
+     
         if self.req_label:
             label = Image.fromarray(label).resize((448, 448), resample=Image.NEAREST)
             label = np.asarray(label, dtype=np.int64)
@@ -102,17 +100,16 @@ class COCO(data.Dataset):
             if self.req_augment:
                 image, label = self._augmentation(image, label)
 
-        image = image[:, :, ::-1] #bgr to rgb
-        plt.imsave('{:d}_img.jpg'.format(index))
-        plt.imsave('{:d}_lab.jpg'.format(label))
-        image = image.transpose(2, 0, 1) #CHW
-        image = self.transform(image)
+        image = image[:, :, ::-1].astype(np.uint8) #bgr to rgb
+        plt.imsave('{:d}_img.jpg'.format(index), image)
+        plt.imsave('{:d}_lab.jpg'.format(index), label)
+        image = self.transform(image.copy())
 
         return image, torch.from_numpy(label)
 
         
 if __name__ == "__main__":
-    coco_data = COCO('../dataset/COCO', 'train2017', req_label=True)
+    coco_data = COCO('../dataset/COCO', 'train2017', req_label=True, req_augment=True, scales=(1, 1.5, 2), flip=True)
     img, label = coco_data[0]
     print(img.size())
     print(label.size())
