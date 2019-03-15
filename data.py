@@ -53,12 +53,12 @@ class COCO(data.Dataset):
 
     def _augmentation(self, image, label):
         scale_factor = random.choice(self.scales)
-        h, w = image.shape()
+        h, w = label.shape
         th, tw = int(scale_factor * h), int(scale_factor * w)
         
         image = cv2.resize(image, (th, tw), interpolation=cv2.INTER_LINEAR)
         label = Image.fromarray(label).resize((th, tw), resample=Image.NEAREST)
-        label = np.asarray(label, dtype=np.int64)
+        label = np.asarray(label, dtype=np.uint8)
 
         h, w = label.shape
         start_h = random.randint(0, h - self.crop_size)
@@ -79,7 +79,7 @@ class COCO(data.Dataset):
         COCOid = self.ids[index]
         filename = self.id_to_filename[COCOid]
 
-        image = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR).astype(np.float32)
+        image = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR)
         
         if self.req_label:
             filename = filename.split('.')[0] + ".png"
@@ -91,21 +91,21 @@ class COCO(data.Dataset):
 
     def __getitem__(self, index):
         image, label = self._load_data(index)
-        image = cv2.resize(image, (448, 448), interpolation=cv2.INTER_LINEAR)
+        image = cliv2.resize(image, (448, 448), interpolation=cv2.INTER_LINEAR)
      
         if self.req_label:
             label = Image.fromarray(label).resize((448, 448), resample=Image.NEAREST)
-            label = np.asarray(label, dtype=np.int64)
+            label = np.asarray(label, dtype=np.uint8)
 
             if self.req_augment:
                 image, label = self._augmentation(image, label)
 
-        image = image[:, :, ::-1].astype(np.uint8) #bgr to rgb
+        image = image[:, :, ::-1] #bgr to rgb
         plt.imsave('{:d}_img.jpg'.format(index), image)
         plt.imsave('{:d}_lab.jpg'.format(index), label)
         image = self.transform(image.copy())
 
-        return image, torch.from_numpy(label)
+        return image, torch.from_numpy(label.astype(np.int32))
 
         
 if __name__ == "__main__":
