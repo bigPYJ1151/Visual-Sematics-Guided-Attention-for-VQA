@@ -91,7 +91,7 @@ class COCO(data.Dataset):
 
     def __getitem__(self, index):
         image, label = self._load_data(index)
-        image = cliv2.resize(image, (448, 448), interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, (448, 448), interpolation=cv2.INTER_LINEAR)
      
         if self.req_label:
             label = Image.fromarray(label).resize((448, 448), resample=Image.NEAREST)
@@ -102,20 +102,20 @@ class COCO(data.Dataset):
 
         image = image[:, :, ::-1] #bgr to rgb
         plt.imsave('{:d}_img.jpg'.format(index), image)
-        plt.imsave('{:d}_lab.jpg'.format(index), label)
         image = self.transform(image.copy())
 
-        return image, torch.from_numpy(label.astype(np.int32))
+        if label is None:
+            return image
+        else:
+            return image, torch.from_numpy(label.astype(np.int32))
 
         
 if __name__ == "__main__":
-    coco_data = COCO('../dataset/COCO', 'train2017', req_label=True, req_augment=True, scales=(1, 1.5, 2), flip=True)
-    img, label = coco_data[0]
+    coco_data = COCO('../dataset/COCO', 'train2014')
+    img = coco_data[0]
     print(img.size())
-    print(label.size())
-    img, label = coco_data[10]
+    img = coco_data[10]
     print(img)
-    print(label)
         
         
 
