@@ -101,23 +101,12 @@ class COCO(data.Dataset):
                 image, label = self._augmentation(image, label)
 
         image = image[:, :, ::-1] #bgr to rgb
-        plt.imsave('{:d}_img.jpg'.format(index), image)
         image = self.transform(image.copy())
 
         if label is None:
             return image
         else:
             return image, torch.from_numpy(label.astype(np.int32))
-
-        
-if __name__ == "__main__":
-    coco_data = COCO('../dataset/COCO', 'train2014')
-    img = coco_data[0]
-    print(img.size())
-    img = coco_data[10]
-    print(img)
-        
-        
 
 
     
