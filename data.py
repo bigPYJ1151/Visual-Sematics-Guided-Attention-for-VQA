@@ -108,6 +108,9 @@ class COCO(data.Dataset):
         else:
             return image, torch.from_numpy(label.astype(np.int32))
 
+    def __len__(self):
+        return len(self.ids)
+
 
     
     
