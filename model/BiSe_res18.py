@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18
@@ -21,9 +20,9 @@ class BiSeNet(nn.Module):
                                      Predict_Score(128, class_nums, 8),
                                      Predict_Score(128 * 2, class_nums, 8)])
         self.ffm = FeatureFusionModule(128 * 2, 128 * 2, scale=4)
-        #self.loss = nn.CrossEntropyLoss(ignore_index=ignored_label)
+        self.loss = nn.CrossEntropyLoss(ignore_index=ignored_label)
 
-    def forward(self, x):
+    def forward(self, x, label):
         spatial_feat = self.spatial_path(x)
         context_feat = self.context_path(x) #[stage3,stage4]
         global_context = self.globalpooling(context_feat[1])
@@ -43,12 +42,12 @@ class BiSeNet(nn.Module):
         final_feature = self.ffm(spatial_feat, context_feat)
         score3 = self.Scores[2](final_feature)
 
-        # loss1 = self.loss(score1, label)
-        # loss2 = self.loss(score2, label)
-        # loss3 = self.loss(score3, label)
-        # loss = loss1 + loss2 + loss3
+        loss1 = self.loss(score1, label)
+        loss2 = self.loss(score2, label)
+        loss3 = self.loss(score3, label)
+        loss = loss1 + loss2 + loss3
 
-        return score1, score2, score3
+        return loss, score3.detach()
 
 class FeatureFusionModule(nn.Module):
     
