@@ -22,9 +22,9 @@ def main(device):
     
     train_data = COCO(CONFIG.DATASET.COCO, 'train2017', req_label=True, req_augment=True, scales=CONFIG.DATASET.SCALES, flip=True)
     val_data = COCO(CONFIG.DATASET.COCO, 'val2017', req_label=True)
-    train_loader = DataLoader(train_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN, 
+    train_loader = DataLoader(train_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN, drop_last=True,
                             shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True)
-    val_loader = DataLoader(val_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN, 
+    val_loader = DataLoader(val_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN, drop_last=True,
                             shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True)
     global total_iter
     total_iter = float(int(CONFIG.SOLVER.EPOCHS * len(train_data) / CONFIG.DATALOADER.BATCH_SIZE.TRAIN))
@@ -39,6 +39,7 @@ def main(device):
 
     for epoch in range(CONFIG.SOLVER.EPOCHS):
         Epoch_Step(seg_model, train_loader, optimizer, epoch, recorder)
+        torch.cuda.empty_cache()
         with torch.no_grad() :
             Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False)
 
