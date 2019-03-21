@@ -5,7 +5,7 @@ from torchvision.models import resnet18
 
 class BiSeNet(nn.Module):
 
-    def __init__(self, class_nums, ignored_label):
+    def __init__(self, class_nums):
         super().__init__()
         self.context_path = Backbone()
         self.spatial_path = SpatialPath(128)
