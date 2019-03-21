@@ -106,7 +106,7 @@ class COCO(data.Dataset):
         if label is None:
             return image
         else:
-            return image, torch.from_numpy(label.astype(np.int32))
+            return image, torch.from_numpy(label.astype(np.int64))
 
     def __len__(self):
         return len(self.ids)

@@ -1,17 +1,17 @@
+
+import torch
 import torch.nn as nn
 import yaml
 from addict import Dict
+import click
+import os
 
-def conv_ben_relu(in_planes, out_planes, kernal, stride, pad, bn=True, relu=False, bias=False):
-    mlist = []
-    mlist.append(nn.Conv2d(in_planes, out_planes, kernal, stride=stride, padding=pad, bias=bias))
-    
-    if bn:
-        mlist.append(nn.BatchNorm2d(out_planes))
+@click.command()
+@click.option('--device', default='0')
+def main(device):
+    print(device)
+    os.environ["CUDA_VISIBLE_DEVICES"] = device
+    print(torch.cuda.current_device())
 
-    if relu:
-        mlist.append(nn.ReLU(inplace=True))
-
-    return nn.Sequential(*mlist)    
-s = Dict(yaml.load(open('config.yaml')))
-print(1/2)
+if __name__ == "__main__":
+    main()
