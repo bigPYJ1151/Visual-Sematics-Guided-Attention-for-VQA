@@ -65,16 +65,17 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
     fmt = '{:.4f}'.format
     tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
     np.seterr(divide='ignore', invalid='ignore')
+    loss_layer = nn.CrossEntropyLoss(ignore_index=CONFIG.DATA.IGNORE_LABEL).cuda()
 
     for image, label in tloader:
         image = image.cuda()
         label = label.cuda()
 
-        loss, score = target_model(image, label)
-        loss = loss.mean()
+        score1, score2, score3 = target_model(image, label)
+        loss = loss_layer(score1) + loss_layer(score2) + loss_layer(score3)
 
         loss_window.update(loss.detach().cpu().numpy())
-        ans = Model_Score(label.detach().cpu().numpy(), score.argmax(dim=1, keepdim=True).cpu().numpy(), CONFIG.DATASET.CLASS_NUM)
+        ans = Model_Score(label.detach().cpu().numpy(), score.detach().argmax(dim=1, keepdim=True).cpu().numpy(), CONFIG.DATASET.CLASS_NUM)
         PA_window.update(ans["Pixel Accuracy"])
         MA_window.update(ans["Mean Accuracy"])
         MI_window.update(ans["Mean IoU"])
