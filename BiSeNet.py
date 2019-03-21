@@ -12,7 +12,6 @@ from addict import Dict
 from tqdm import tqdm
 
 CONFIG = Dict(yaml.load(open('config.yaml'))['BISENET'])
-np.seterr(divide='ignore', invalid='ignore')
 total_iter = 0
 current_iter = 0
 
@@ -42,7 +41,7 @@ def main(device):
     for epoch in range(CONFIG.SOLVER.EPOCHS):
         Epoch_Step(seg_model, train_loader, optimizer, epoch, recorder)
         with torch.no_grad() :
-            Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False, val_rate=CONFIG.SOLVER.VAL_RATE)
+            Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False)
 
         name = "Epoch_{:d}".format(epoch)
         results = {
@@ -51,7 +50,7 @@ def main(device):
         }
         torch.save(results, os.path.join(CONFIG.SOLVER.SAVE_PATH, 'bisenet_{}.pth'.format(name)))
 
-def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True, val_rate=1):
+def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
     if Train:
         target_model.train()
         mode = 'Train'
@@ -63,14 +62,11 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True, val
     PA_window = window()
     MA_window = window()
     MI_window = window()
-    counter = 0
     fmt = '{:.4f}'.format
     tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
+    np.seterr(divide='ignore', invalid='ignore')
 
     for image, label in tloader:
-        if counter / len(loader.dataset) > val_rate:
-            break
-
         image = image.cuda()
         label = label.cuda()
 
@@ -91,8 +87,7 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True, val
             loss.backward()
             optimizer.step()
             current_iter += 1
-        else:
-            counter += 1
+
         tloader.set_postfix(loss=fmt(loss_window.value), pix_acc=fmt(PA_window.value))
 
     recorder[mode]['loss'].append(loss_window.value)
