@@ -23,7 +23,7 @@ class BiSeNet(nn.Module):
         self.ffm = FeatureFusionModule(128 * 2, 128 * 2, scale=4)
         #self.loss = nn.CrossEntropyLoss(ignore_index=ignored_label)
 
-    def forward(self, x, label):
+    def forward(self, x):
         spatial_feat = self.spatial_path(x)
         context_feat = self.context_path(x) #[stage3,stage4]
         global_context = self.globalpooling(context_feat[1])

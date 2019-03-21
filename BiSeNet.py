@@ -71,8 +71,8 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
         image = image.cuda()
         label = label.cuda()
 
-        score1, score2, score3 = target_model(image, label)
-        loss = loss_layer(score1) + loss_layer(score2) + loss_layer(score3)
+        score1, score2, score3 = target_model(image)
+        loss = loss_layer(score1, label) + loss_layer(score2, label) + loss_layer(score3, label)
 
         loss_window.update(loss.detach().cpu().numpy())
         ans = Model_Score(label.detach().cpu().numpy(), score.detach().argmax(dim=1, keepdim=True).cpu().numpy(), CONFIG.DATASET.CLASS_NUM)
