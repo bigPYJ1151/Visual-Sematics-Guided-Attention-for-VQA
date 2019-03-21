@@ -1,6 +1,7 @@
 
 import torch
 import torch.nn as nn
+from torchvision.models import resnet18
 
 class BiSeNet(nn.Module):
 
@@ -12,18 +13,13 @@ class BiSeNet(nn.Module):
             nn.AdaptiveAvgPool2d(1),
             conv_ben_relu(512, 128, 1, 1, 0, bias=False)
         )
-        
-        ARMs = [AttentionRefinement(512, 128),
-                AttentionRefinement(256, 128)]
-        Refine = [conv_ben_relu(128, 128, 3, 1, 1, bias=False),
-                conv_ben_relu(128, 128, 3, 1, 1, bias=False)] #keep size
-        Scores = [Predict_Score(128, class_nums, 16),
-                Predict_Score(128, class_nums, 8),
-                Predict_Score(128 * 2, class_nums, 8)] #stage2,stage3,final
-
-        self.arms = nn.ModuleList(ARMs)
-        self.refines = nn.ModuleList(Refine)
-        self.Scores = nn.ModuleList(Scores)
+        self.arms = nn.ModuleList([AttentionRefinement(512, 128),
+                                    AttentionRefinement(256, 128)])
+        self.refines = nn.ModuleList([conv_ben_relu(128, 128, 3, 1, 1, bias=False),
+                                    conv_ben_relu(128, 128, 3, 1, 1, bias=False)])
+        self.Scores = nn.ModuleList([Predict_Score(128, class_nums, 16),
+                                     Predict_Score(128, class_nums, 8),
+                                     Predict_Score(128 * 2, class_nums, 8)])
         self.ffm = FeatureFusionModule(128 * 2, 128 * 2, scale=4)
         self.loss = nn.CrossEntropyLoss(ignore_index=ignored_label)
 

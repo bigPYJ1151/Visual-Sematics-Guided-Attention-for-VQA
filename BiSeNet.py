@@ -2,7 +2,6 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchvision.models import resnet18
 import numpy as np
 from data import COCO
 from model.BiSe_res18 import BiSeNet
@@ -13,6 +12,7 @@ from addict import Dict
 from tqdm import tqdm
 
 CONFIG = Dict(yaml.load(open('config.yaml'))['BISENET'])
+np.seterr(divide='ignore', invalid='ignore')
 total_iter = 0
 current_iter = 0
 
@@ -32,7 +32,7 @@ def main(device):
     total_iter = float(int(CONFIG.SOLVER.EPOCHS * len(train_data) / CONFIG.DATALOADER.BATCH_SIZE.TRAIN))
     print("Dataset Ready.")
 
-    seg_model = nn.DataParallel(BiSeNet(CONFIG.DATASET.CLASS_NUM).cuda())
+    seg_model = nn.DataParallel(BiSeNet(CONFIG.DATASET.CLASS_NUM, CONFIG.DATASET.IGNORE_LABEL).cuda())
     optimizer = torch.optim.SGD(seg_model.parameters(), lr=CONFIG.SOLVER.INITIAL_LR, momentum=CONFIG.SOLVER.MOMENTUM, 
                                 weight_decay=CONFIG.SOLVER.WEIGHT_DECAY, nesterov=True)
     recorder = {"Train":{'loss':[], 'PA':[], 'MA':[], 'MI':[]},
@@ -41,12 +41,13 @@ def main(device):
 
     for epoch in range(CONFIG.SOLVER.EPOCHS):
         Epoch_Step(seg_model, train_loader, optimizer, epoch, recorder)
-        Epoch_Step(seg_model, Val_loader, optimizer, epoch, recorder, Train=False, val_rate=CONFIG.SOLVER.VAL_RATE)
+        with torch.no_grad() :
+            Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False, val_rate=CONFIG.SOLVER.VAL_RATE)
 
         name = "Epoch_{:d}".format(epoch)
-        result = {
+        results = {
             'model':seg_model.state_dict(),
-            'recorder':recoder
+            'recorder':recorder
         }
         torch.save(results, os.path.join(CONFIG.SOLVER.SAVE_PATH, 'bisenet_{}.pth'.format(name)))
 
@@ -64,9 +65,9 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True, val
     MI_window = window()
     counter = 0
     fmt = '{:.4f}'.format
-    loader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
+    tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
 
-    for image, label in loader:
+    for image, label in tloader:
         if counter / len(loader.dataset) > val_rate:
             break
 
@@ -74,6 +75,7 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True, val
         label = label.cuda()
 
         loss, score = target_model(image, label)
+        loss = loss.mean()
 
         loss_window.update(loss.detach().cpu().numpy())
         ans = Model_Score(label.detach().cpu().numpy(), score.argmax(dim=1, keepdim=True).cpu().numpy(), CONFIG.DATASET.CLASS_NUM)
@@ -91,12 +93,12 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True, val
             current_iter += 1
         else:
             counter += 1
-        loader.set_postfix(loss=fmt(loss_window.value), pix_acc=fmt(PA_window.value))
+        tloader.set_postfix(loss=fmt(loss_window.value), pix_acc=fmt(PA_window.value))
 
-    recoder[mode]['loss'].append(loss_window.value)
-    recoder[mode]['PA'].append(PA_window.value)
-    recoder[mode]['MA'].append(MA_window.value)
-    recoder[mode]['MI'].append(MI_window.value)
+    recorder[mode]['loss'].append(loss_window.value)
+    recorder[mode]['PA'].append(PA_window.value)
+    recorder[mode]['MA'].append(MA_window.value)
+    recorder[mode]['MI'].append(MI_window.value)
 
 def lr_update(optimizer):
     lr = CONFIG.SOLVER.INITIAL_LR * (1 - current_iter / total_iter) ** 0.9
