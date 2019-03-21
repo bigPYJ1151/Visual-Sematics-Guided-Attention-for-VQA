@@ -39,9 +39,7 @@ def main(device):
 
     for epoch in range(CONFIG.SOLVER.EPOCHS):
         Epoch_Step(seg_model, train_loader, optimizer, epoch, recorder)
-        torch.cuda.empty_cache()
-        with torch.no_grad() :
-            Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False)
+        Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False)
 
         name = "Epoch_{:d}".format(epoch)
         results = {
@@ -79,13 +77,13 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
         MA_window.update(ans["Mean Accuracy"])
         MI_window.update(ans["Mean IoU"])
 
+        optimizer.zero_grad()
+        lr_update(optimizer)
+        loss.backward()
+        optimizer.step()
+
         if Train:
             global current_iter
-            optimizer.zero_grad()
-            lr_update(optimizer)
-
-            loss.backward()
-            optimizer.step()
             current_iter += 1
 
         tloader.set_postfix(loss=fmt(loss_window.value), pix_acc=fmt(PA_window.value))
