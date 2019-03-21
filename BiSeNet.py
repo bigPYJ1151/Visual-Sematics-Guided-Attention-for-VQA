@@ -31,7 +31,7 @@ def main(device):
     total_iter = float(int(CONFIG.SOLVER.EPOCHS * len(train_data) / CONFIG.DATALOADER.BATCH_SIZE.TRAIN))
     print("Dataset Ready.")
 
-    seg_model = nn.DataParallel(BiSeNet(CONFIG.DATASET.CLASS_NUM).cuda())
+    seg_model = nn.DataParallel(BiSeNet(CONFIG.DATASET.CLASS_NUM, CONFIG.DATASET.IGNORE_LABEL).cuda())
     optimizer = torch.optim.SGD(seg_model.parameters(), lr=CONFIG.SOLVER.INITIAL_LR, momentum=CONFIG.SOLVER.MOMENTUM, 
                                 weight_decay=CONFIG.SOLVER.WEIGHT_DECAY, nesterov=True)
     recorder = {"Train":{'loss':[], 'PA':[], 'MA':[], 'MI':[]},
