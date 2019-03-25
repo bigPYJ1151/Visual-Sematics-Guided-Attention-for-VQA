@@ -7,5 +7,5 @@ import click
 from model.BiSe_res18 import BiSeNet
 import os
 
-m = nn.DataParallel(BiSeNet(200, 1).cuda())
-print(m.named_parameters)
+CONFIG = yaml.load(open('config.yaml'))['VQA']
+print(CONFIG)

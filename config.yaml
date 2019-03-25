@@ -19,13 +19,3 @@ BISENET:
     VAL_RATE: 0.2
     SAVE_PATH: record
 
-VQA:
-  DATASET:
-    COCO: ../dataset/COCO
-    VQA: ../dataset/VQAv1
-  
-  IMAGE_FEATURE:
-    MODEL:
-      RES152: ...
-      BISENET: model/
-

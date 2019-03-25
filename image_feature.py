@@ -12,11 +12,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-CONFIG = Dict(yaml.load(open('config.yaml'))['VQA'])
+CONFIG = Dict(yaml.load(open('config.yaml'))['BISENET'])
 
-def image_ans(item, v, n):
-    plt.imshow(v)
-    plt.savefig('{0:d}_{1}.jpg'.format(item, n))
+def image(v, name):
+    plt.imsave('{}.png'.format(name), v.transpose(1,2,0))
 
 def ans_plot(train, val, name):
     plt.rcParams['figure.figsize'] = (8, 4.944)
@@ -41,7 +40,7 @@ def main(device):
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     torch.backends.cudnn.benchmark = True
 
-    result = torch.load(os.path.join(CONFIG['IMAGE_FEATURE']['MODEL']['BISENET'], ''))
+    result = torch.load(os.path.join('record', 'bisenet_49.pth'))
     recorder = result['recorder']
     ans_plot(recorder['Train']['loss'], recorder['Val']['loss'], 'loss')
     ans_plot(recorder['Train']['PA'], recorder['Val']['PA'], 'Pixel acc')
@@ -62,14 +61,14 @@ def main(device):
 
             loss, score = seg_model(im_train.unsqueeze(0).cuda(), la_train.unsqueeze(0).cuda())
             pre_la_train = score.argmax(dim=1, keepdim=True).squeeze(0).cpu().numpy()
-            image_ans(i, pre_la, 'train_pre')
-            image_ans(i, la_train.numpy(), 'train_real')
+            image(pre_la_train, 'pre_train{}'.format(i))
+            image(la_train, 'real_train{}'.format(i))
 
             im_train, la_train = val_data[i]
             loss, score = seg_model(im_train.unsqueeze(0).cuda(), la_train.unsqueeze(0).cuda())
             pre_la_train = score.argmax(dim=1, keepdim=True).squeeze(0).cpu().numpy()
-            image_ans(i, pre_la, 'val_pre')
-            image_ans(i, la_train.numpy(), 'val_real')
+            image(pre_la_train, 'pre_val{}'.format(i))
+            image(la_train, 'real_val{}'.format(i))
 
 if __name__ == "__main__":
     main()
