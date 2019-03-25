@@ -1,21 +1,31 @@
 BISENET:
- DATASET:
-  COCO: ../dataset/COCO
-  SCALES: [1.0, 1.5, 1.75, 2.0]
-  CLASS_NUM: 182
-  IGNORE_LABEL: 255
+  DATASET:
+    COCO: ../dataset/COCO
+    SCALES: [1.0, 1.5, 1.75, 2.0]
+    CLASS_NUM: 182
+    IGNORE_LABEL: 255
 
- DATALOADER:
-  WORKERS: 12
-  BATCH_SIZE:
-   TRAIN: 12
-   TEST: 20
+  DATALOADER:
+    WORKERS: 12
+    BATCH_SIZE:
+      TRAIN: 12
+      TEST: 20
  
+  SOLVER:
+    EPOCHS: 50
+    MOMENTUM: 0.9
+    WEIGHT_DECAY: 0.0001
+    INITIAL_LR: 0.025
+    VAL_RATE: 0.2
+    SAVE_PATH: record
 
- SOLVER:
-  EPOCHS: 50
-  MOMENTUM: 0.9
-  WEIGHT_DECAY: 0.0001
-  INITIAL_LR: 0.025
-  VAL_RATE: 0.2
-  SAVE_PATH: record
+VQA:
+  DATASET:
+    COCO: ../dataset/COCO
+    VQA: ../dataset/VQAv1
+  
+  IMAGE_FEATURE:
+    MODEL:
+      RES152: ...
+      BISENET: model/
+

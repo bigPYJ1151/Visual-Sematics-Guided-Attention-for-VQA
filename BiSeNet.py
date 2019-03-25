@@ -78,13 +78,13 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
         MI_window.update(ans["Mean IoU"])
 
         optimizer.zero_grad()
-        lr_update(optimizer)
         loss.backward()
-        optimizer.step()
 
         if Train:
             global current_iter
+            lr_update(optimizer)
             current_iter += 1
+            optimizer.step()
 
         tloader.set_postfix(loss=fmt(loss_window.value), pix_acc=fmt(PA_window.value))
 
