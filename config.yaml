@@ -19,3 +19,8 @@ BISENET:
     VAL_RATE: 0.2
     SAVE_PATH: record
 
+VQA:
+  DATASET:
+    COCO: ../dataset/COCO
+    VQA: ../dataset/VQAv1
+    COCO_PROCESSED: dataset/image_processed.h5

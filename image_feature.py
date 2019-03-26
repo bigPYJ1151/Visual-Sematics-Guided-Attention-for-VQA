@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from model.BiSe_res18 import BiSeNet
+from model.ResNet152 import ResNet152
+from data import COCO
 import click
 import os
 import yaml
@@ -12,27 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-CONFIG = Dict(yaml.load(open('config.yaml'))['BISENET'])
-
-def image(v, name):
-    plt.imsave('{}.png'.format(name), v.transpose(1,2,0))
-
-def ans_plot(train, val, name):
-    plt.rcParams['figure.figsize'] = (8, 4.944)
-    plt.rcParams['savefig.dpi'] = 800
-    plt.rcParams['figure.dpi'] = 800
-
-    plt.figure()
-    plt.plot(train , label = "Train")
-    plt.plot(val, label = 'Val')
-    plt.xlim(xmin=0)
-    plt.title("{} log".format(name))
-    plt.xlabel('epoches')
-    plt.ylabel(name)
-    plt.xticks(np.arange(0, 50))
-    plt.legend()
-    plt.grid()
-    plt.savefig("{}_all.jpg".format(name))
+CONFIG_VQA = Dict(yaml.load(open('config.yaml'))['VQA'])
+CONFIG_BIS = Dict(yaml.load(open('config.yaml'))['BISENET'])
 
 @click.command()
 @click.option('--device', default='0')
@@ -40,35 +23,37 @@ def main(device):
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     torch.backends.cudnn.benchmark = True
 
-    result = torch.load(os.path.join('record', 'bisenet_49.pth'))
-    recorder = result['recorder']
-    ans_plot(recorder['Train']['loss'], recorder['Val']['loss'], 'loss')
-    ans_plot(recorder['Train']['PA'], recorder['Val']['PA'], 'Pixel acc')
-    ans_plot(recorder['Train']['MA'], recorder['Val']['MA'], 'Mean acc')
-    ans_plot(recorder['Train']['MI'], recorder['Val']['MI'], 'Mean IOU')
-
-    train_data = COCO(CONFIG.DATASET.COCO, 'train2017', req_label=True)
-    val_data = COCO(CONFIG.DATASET.COCO, 'val2017', req_label=True)
-
-    seg_model = nn.DataParallel(BiSeNet(CONFIG.DATASET.CLASS_NUM, CONFIG.DATASET.IGNORE_LABEL).cuda())
+    result = torch.load(os.path.join('model', 'bisenet_49.pth'))
+    
+    seg_model = nn.DataParallel(BiSeNet(CONFIG_BIS.DATASET.CLASS_NUM, CONFIG_BIS.DATASET.IGNORE_LABEL).cuda())
     seg_model.load_state_dict(result['model'])
     seg_model.eval()
+    resnet = nn.DataParallel(ResNet152().cuda())
+    resnet.eval()
     print('Model Ready.')
 
-    with torch.no_grad():
-        for i in range(10):
-            im_train, la_train = train_data[i]
+    for split, name in zip(['train2014', 'val2014'], ['train_image', 'val_image']):
+        loader = DataLoader(COCO(CONFIG_VQA.DATASET.COCO, split), batch_size=CONFIG_BIS.DATALOADER.BATCH_SIZE.TEST,
+                        pin_memory=True, num_workers=CONFIG_BIS.DATALOADER.WORKERS, shuffle=False)
+        feature_shape = (len(loader.dataset), 2048, 14, 14)
+        semantic_shape = (len(loader.dataset), 14, 14)
 
-            loss, score = seg_model(im_train.unsqueeze(0).cuda(), la_train.unsqueeze(0).cuda())
-            pre_la_train = score.argmax(dim=1, keepdim=True).squeeze(0).cpu().numpy()
-            image(pre_la_train, 'pre_train{}'.format(i))
-            image(la_train, 'real_train{}'.format(i))
+        with h5.File(CONFIG_VQA.DATASET.COCO_PROCESSED, libver='latest') as f:
+            features = f.create_dataset(name+'_feature', shape=feature_shape, dtype='float16')
+            semantics = f.create_dataset(name+'_semantic', shape=semantic_shape, dtype='int32')
 
-            im_train, la_train = val_data[i]
-            loss, score = seg_model(im_train.unsqueeze(0).cuda(), la_train.unsqueeze(0).cuda())
-            pre_la_train = score.argmax(dim=1, keepdim=True).squeeze(0).cpu().numpy()
-            image(pre_la_train, 'pre_val{}'.format(i))
-            image(la_train, 'real_val{}'.format(i))
+            with torch.no_grad():
+                i = 0
+                for image in tqdm(loader):
+                    image = image.cuda()
+                    feature = resnet(image).detach().cpu().numpy().astype(np.float16)
+                    score = seg_model(image)
+                    label = score.argmax(dim=1, keepdim=True).squeeze().cpu().numpy().astype(np.int32)
+                    
+                    features[i:(i+image.size(0))] = feature
+                    semantics[i:(i+image.size(0))] = label
+
+                    i += 1
 
 if __name__ == "__main__":
     main()
