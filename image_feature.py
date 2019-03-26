@@ -24,7 +24,7 @@ def main(device):
     torch.backends.cudnn.benchmark = True
 
     result = torch.load(os.path.join('model', 'bisenet_49.pth'))
-    
+
     seg_model = nn.DataParallel(BiSeNet(CONFIG_BIS.DATASET.CLASS_NUM, CONFIG_BIS.DATASET.IGNORE_LABEL).cuda())
     seg_model.load_state_dict(result['model'])
     seg_model.eval()
@@ -36,11 +36,11 @@ def main(device):
         loader = DataLoader(COCO(CONFIG_VQA.DATASET.COCO, split), batch_size=CONFIG_BIS.DATALOADER.BATCH_SIZE.TEST,
                         pin_memory=True, num_workers=CONFIG_BIS.DATALOADER.WORKERS, shuffle=False)
         feature_shape = (len(loader.dataset), 2048, 14, 14)
-        semantic_shape = (len(loader.dataset), 14, 14)
+        semantic_shape = (len(loader.dataset), 448, 448)
 
         with h5.File(CONFIG_VQA.DATASET.COCO_PROCESSED, libver='latest') as f:
             features = f.create_dataset(name+'_feature', shape=feature_shape, dtype='float16')
-            semantics = f.create_dataset(name+'_semantic', shape=semantic_shape, dtype='int32')
+            semantics = f.create_dataset(name+'_semantic', shape=semantic_shape, dtype='int8')
 
             with torch.no_grad():
                 i = 0
