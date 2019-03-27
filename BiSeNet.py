@@ -64,7 +64,7 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
     tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
     np.seterr(divide='ignore', invalid='ignore')
 
-    for image, label in tloader:
+    for image, label, _ in tloader:
         image = image.cuda()
         label = label.cuda()
 

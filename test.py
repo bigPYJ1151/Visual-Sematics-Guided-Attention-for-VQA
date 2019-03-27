@@ -6,6 +6,6 @@ from addict import Dict
 import click
 from model.BiSe_res18 import BiSeNet
 import os
+import numpy as np 
 
-CONFIG = yaml.load(open('config.yaml'))['VQA']
-print(CONFIG)
+s = np.array([1.2,3,4]).astype(np.float32)

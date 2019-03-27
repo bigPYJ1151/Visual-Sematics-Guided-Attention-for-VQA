@@ -83,7 +83,7 @@ class Predict_Score(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
-        x = nn.functional.interpolate(x, scale_factor=self.scale, mode='bilinear', align_corners=True)
+        #x = nn.functional.interpolate(x, scale_factor=self.scale, mode='bilinear', align_corners=True)
 
         return x
 

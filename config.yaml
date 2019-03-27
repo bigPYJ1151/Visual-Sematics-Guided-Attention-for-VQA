@@ -24,3 +24,5 @@ VQA:
     COCO: ../dataset/COCO
     VQA: ../dataset/VQAv1
     COCO_PROCESSED: dataset/image_processed.h5
+    VOCAB: dataset/vocab.json
+    VOCAB_NUM: 4000

@@ -30,30 +30,37 @@ def main(device):
     seg_model.eval()
     resnet = nn.DataParallel(ResNet152().cuda())
     resnet.eval()
+    pool = nn.AdaptiveMaxPool2d(14).cuda()
     print('Model Ready.')
 
     for split, name in zip(['train2014', 'val2014'], ['train_image', 'val_image']):
         loader = DataLoader(COCO(CONFIG_VQA.DATASET.COCO, split), batch_size=CONFIG_BIS.DATALOADER.BATCH_SIZE.TEST,
                         pin_memory=True, num_workers=CONFIG_BIS.DATALOADER.WORKERS, shuffle=False)
         feature_shape = (len(loader.dataset), 2048, 14, 14)
-        semantic_shape = (len(loader.dataset), 448, 448)
+        semantic_shape = (len(loader.dataset), 182, 14, 14)
+        id_shape = (len(loader.dataset),)
 
         with h5.File(CONFIG_VQA.DATASET.COCO_PROCESSED, libver='latest') as f:
             features = f.create_dataset(name+'_feature', shape=feature_shape, dtype='float16')
-            semantics = f.create_dataset(name+'_semantic', shape=semantic_shape, dtype='int8')
+            semantics = f.create_dataset(name+'_semantic', shape=semantic_shape, dtype='float16')
+            ids = f.create_dataset(name+'_ids', shape=id_shape, dtype='int32')
 
             with torch.no_grad():
                 i = 0
-                for image in tqdm(loader):
+                for image, COCOid in tqdm(loader):
                     image = image.cuda()
                     feature = resnet(image).detach().cpu().numpy().astype(np.float16)
+                    print(feature.shape)
                     score = seg_model(image)
-                    label = score.argmax(dim=1, keepdim=True).squeeze().cpu().numpy().astype(np.int32)
+                    print(score.size())
+                    score = pool(score).detach().cpu().numpy().astype(np.float16)
+                    print(score.shape)
                     
                     features[i:(i+image.size(0))] = feature
-                    semantics[i:(i+image.size(0))] = label
+                    semantics[i:(i+image.size(0))] = score
+                    ids[i:(i+image.size(0))] = COCOid.detach().numpy().astype(np.int32)
 
-                    i += 1
+                    i += image.size(0)
 
 if __name__ == "__main__":
     main()
