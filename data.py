@@ -4,6 +4,8 @@ import random
 import os
 import numpy as np
 import torch 
+import json
+import h5py
 from torch.utils import data
 from torchvision import transforms
 from PIL import Image
@@ -68,7 +70,7 @@ class VQA(data.Dataset):
         cv2.setNumThreads(0)
 
     def data_recover(self, item, a_index = None):     
-        q = self.questions_origin[item]
+        q =' '.join(self.questions_origin[item]) 
 
         if hasattr(self, 'answer_path') and a_index is None:
             a_encode = list(self.answers[item])
@@ -130,7 +132,7 @@ class VQA(data.Dataset):
     @property
     def max_question_length(self):
         if not hasattr(self, 'max_length'):
-            self.max_length = max(map(len, self.questions))
+            self.max_length = max(map(len, self.questions_origin))
         return self.max_length
 
     def _check_integrity(self, question_json, answer_json):
@@ -160,16 +162,20 @@ class VQA(data.Dataset):
     def __getitem__(self, item):
         q, qlen = self.questions[item]
         image_id = self.COCOids[item]
-
+        #test
+        filename = self.COCOid_to_filename[image_id]
+        v = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR)
+        v = cv2.resize(v, (448, 448), interpolation=cv2.INTER_LINEAR)
+        v = v[:, :, ::-1] #bgr to rgb
+        vo = self.transform(v.copy())
+        #test
         if self.mode in [0, 1]:
             a = self.answers[item]
             v, l = self._get_image_feature(image_id)
-            print(self.questions_origin[item])
-            print(self.answers_origin[item])
-            return qlen, q, a, v, l, item
+            return qlen, q, a, vo, v, l, item
         
         else:
-            filename = self.COCOid_to_filename(image_id)
+            filename = self.COCOid_to_filename[image_id]
             v = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR)
             v = cv2.resize(v, (448, 448), interpolation=cv2.INTER_LINEAR)
             v = v[:, :, ::-1] #bgr to rgb
