@@ -23,7 +23,7 @@ def main(device):
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     torch.backends.cudnn.benchmark = True
 
-    result = torch.load(os.path.join('model', 'bisenet_49.pth'))
+    result = torch.load(os.path.join('model', CONFIG_VQA.MODEL.BISENET))
 
     seg_model = nn.DataParallel(BiSeNet(CONFIG_BIS.DATASET.CLASS_NUM, CONFIG_BIS.DATASET.IGNORE_LABEL).cuda())
     seg_model.load_state_dict(result['model'])
@@ -50,11 +50,9 @@ def main(device):
                 for image, COCOid in tqdm(loader):
                     image = image.cuda()
                     feature = resnet(image).detach().cpu().numpy().astype(np.float16)
-                    print(feature.shape)
+
                     score = seg_model(image)
-                    print(score.size())
                     score = pool(score).detach().cpu().numpy().astype(np.float16)
-                    print(score.shape)
                     
                     features[i:(i+image.size(0))] = feature
                     semantics[i:(i+image.size(0))] = score

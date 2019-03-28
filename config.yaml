@@ -26,3 +26,6 @@ VQA:
     COCO_PROCESSED: dataset/image_processed.h5
     VOCAB: dataset/vocab.json
     VOCAB_NUM: 4000
+  
+  MODEL:
+    BISENET: bisenet_Epoch_49.pth

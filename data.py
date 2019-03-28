@@ -10,7 +10,7 @@ from PIL import Image
 import matplotlib.image as im
 from text_preprocess import prepare_answers, prepare_questions
 
-class VQA(Dataset):
+class VQA(data.Dataset):
     def __init__(self, COCO_root, QA_root, processed_COCO_path, vocab_path, mode):
         super().__init__()
         self.mode = mode
@@ -164,6 +164,8 @@ class VQA(Dataset):
         if self.mode in [0, 1]:
             a = self.answers[item]
             v, l = self._get_image_feature(image_id)
+            print(self.questions_origin[item])
+            print(self.answers_origin[item])
             return qlen, q, a, v, l, item
         
         else:
@@ -172,7 +174,6 @@ class VQA(Dataset):
             v = cv2.resize(v, (448, 448), interpolation=cv2.INTER_LINEAR)
             v = v[:, :, ::-1] #bgr to rgb
             v = self.transform(v.copy())
-
             return qlen, q, v, item
         
     def __len__(self):
