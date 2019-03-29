@@ -1,0 +1,127 @@
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import numpy as np
+from data import VQA
+from model.VQA import VQA_Model
+import yaml
+import os
+import click
+from addict import Dict 
+from tqdm import tqdm
+
+CONFIG = Dict(yaml.load(open('config.yaml'))['VQA'])
+total_iter = 0
+current_iter = 0
+
+@click.command()
+@click.option('--device', default='0')
+def main(device):
+    os.environ["CUDA_VISIBLE_DEVICES"] = device
+    torch.backends.cudnn.benchmark = True
+    
+    train_data = VQA(CONFIG.DATASET.COCO, CONFIG.DATASET.VQA, CONFIG.DATASET.COCO_PROCESSED,
+                    CONFIG.DATASET.VOCAB, 0)
+    val_data = VQA(CONFIG.DATASET.COCO, CONFIG.DATASET.VQA, CONFIG.DATASET.COCO_PROCESSED,
+                    CONFIG.DATASET.VOCAB, 1)
+    train_loader = DataLoader(train_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN, 
+                            shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True)
+    val_loader = DataLoader(val_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN,
+                            shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True)
+    global total_iter
+    total_iter = float(int(CONFIG.SOLVER.EPOCHS * len(train_data) / CONFIG.DATALOADER.BATCH_SIZE.TRAIN))
+    print("Dataset Ready.")
+
+    target_model = nn.DataParallel(VQA_Model(train_data.embedding_tokens).cuda())
+    #optimizer = torch.optim.SGD(seg_model.parameters(), lr=CONFIG.SOLVER.INITIAL_LR, momentum=CONFIG.SOLVER.MOMENTUM, 
+     #                           weight_decay=CONFIG.SOLVER.WEIGHT_DECAY, nesterov=True)
+    optimizer = torch.optim.Adam(target_model.parameters())
+    recorder = {"Train":{'loss':[], 'acc':[]},
+                "Val":{'loss':[], 'acc':[]}}
+    print("Model Ready.")
+
+    for epoch in range(CONFIG.SOLVER.EPOCHS):
+        Epoch_Step(seg_model, train_loader, optimizer, epoch, recorder)
+        Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False)
+
+        name = "Epoch_{:d}".format(epoch)
+        results = {
+            'model':seg_model.state_dict(),
+            'recorder':recorder
+        }
+        torch.save(results, os.path.join(CONFIG.SOLVER.SAVE_PATH, 'VQA_{}.pth'.format(name)))
+
+def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
+    if Train:
+        target_model.train()
+        mode = 'Train'
+    else:
+        target_model.eval()
+        mode = 'Val'
+
+    loss_window = window()
+    acc_window = window()
+    fmt = '{:.4f}'.format
+    log_softmax = nn.LogSoftmax().cuda()
+    tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
+    np.seterr(divide='ignore', invalid='ignore')
+
+    for qlen, q, a, v, l, item in tloader:
+        qlen = qlen.to(device='cuda', dtype=torch.long)
+        q = q.to(device='cuda', dtype=torch.long)
+        a = a.to(device='cuda', dtype=torch.long)
+        v = v.cuda()
+        l = l.cuda()
+
+        score = target_model(v, l, q, qlen)
+        soft = -log_softmax(score)
+        loss = (soft * a / 10).sum(dim=1).mean()
+        acc = check_accuracy(score.detach(), a)
+
+        loss_window.update(loss.detach().cpu().numpy())
+        acc_window.update(loss.mean().detach().cpu().numpy())
+
+        optimizer.zero_grad()
+        loss.backward()
+
+        if Train:
+            global current_iter
+            lr_update1(optimizer)
+            current_iter += 1
+            optimizer.step()
+
+        tloader.set_postfix(loss=fmt(loss_window.value), acc=fmt(acc_window.value))
+
+    recorder[mode]['loss'].append(loss_window.value)
+    recorder[mode]['acc'].append(acc_window.value)
+
+def lr_update1(optimizer):
+    lr = CONFIG.SOLVER.INITIAL_LR * (1 - current_iter / total_iter) ** 0.9
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+def lr_update2(optimizer):
+    lr = CONFIG.SOLVER.INITIAL_LR * 0.5 ** (float(current_iter)/(total_iter))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+def check_accuracy(predict, real):
+    index = predict.argmax(dim = 1, keepdim = True)
+    current_num = real.gather(dim=1, index=index)
+    return (current_num * 0.3).clamp(max=1)
+
+class window:
+
+    def __init__(self):
+        self.sum = 0
+        self.iter_num = 0
+    
+    def update(self, value):
+        self.sum += value
+        self.iter_num += 1
+    
+    @property
+    def value(self):
+        return self.sum / self.iter_num
+

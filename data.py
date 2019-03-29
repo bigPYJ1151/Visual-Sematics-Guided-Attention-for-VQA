@@ -162,17 +162,11 @@ class VQA(data.Dataset):
     def __getitem__(self, item):
         q, qlen = self.questions[item]
         image_id = self.COCOids[item]
-        #test
-        filename = self.COCOid_to_filename[image_id]
-        v = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR)
-        v = cv2.resize(v, (448, 448), interpolation=cv2.INTER_LINEAR)
-        v = v[:, :, ::-1] #bgr to rgb
-        vo = self.transform(v.copy())
-        #test
+
         if self.mode in [0, 1]:
             a = self.answers[item]
             v, l = self._get_image_feature(image_id)
-            return qlen, q, a, vo, v, l, item
+            return qlen, q, a, v, l, item
         
         else:
             filename = self.COCOid_to_filename[image_id]

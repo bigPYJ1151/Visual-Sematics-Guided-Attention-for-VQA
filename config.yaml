@@ -26,6 +26,19 @@ VQA:
     COCO_PROCESSED: dataset/image_processed.h5
     VOCAB: dataset/vocab.json
     VOCAB_NUM: 4000
+
+  DATALOADER:
+    WORKERS: 12
+    BATCH_SIZE:
+      TRAIN: 128
+      TEST: 200
   
+  SOLVER:
+    EPOCHS: 50
+    MOMENTUM: 0.9
+    WEIGHT_DECAY: 0.0001
+    INITIAL_LR: 0.001
+    SAVE_PATH: record
+
   MODEL:
     BISENET: bisenet_Epoch_49.pth
