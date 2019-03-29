@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 class VQA_Model(nn.Module):
-    def __init__(self, embedding_tokens, question_encode_length = 1024, num_attention_map = 2):
+    def __init__(self, embedding_tokens, answer_num, question_encode_length = 1024, num_attention_map = 2):
         super().__init__()
         image_feature_length = 2048
         semantic_feature_length = 182
@@ -13,7 +13,7 @@ class VQA_Model(nn.Module):
         self.pool = nn.AdaptiveMaxPool2d(1)
 
         in_len = num_attention_map * image_feature_length + question_encode_length + semantic_feature_length
-        self.Classifer = Classifer(in_len, config.vocab_num)
+        self.Classifer = Classifer(in_len, answer_num)
 
         self.Attention_Map = None
 
@@ -24,7 +24,6 @@ class VQA_Model(nn.Module):
         l = nn.functional.normalize(l, dim=1)
         feature, self.Attention_Map = self.Attention(encode_q, v, l)
         l = self.pool(l).squeeze()
-        print(l.size())
 
         feature = torch.cat([feature, encode_q, l], dim=1)
         out = self.Classifer(feature)

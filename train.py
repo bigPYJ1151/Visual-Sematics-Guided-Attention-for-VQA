@@ -26,14 +26,14 @@ def main(device):
     val_data = VQA(CONFIG.DATASET.COCO, CONFIG.DATASET.VQA, CONFIG.DATASET.COCO_PROCESSED,
                     CONFIG.DATASET.VOCAB, 1)
     train_loader = DataLoader(train_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN, 
-                            shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True)
+                            shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_data, batch_size=CONFIG.DATALOADER.BATCH_SIZE.TRAIN,
-                            shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True)
+                            shuffle=True, num_workers=CONFIG.DATALOADER.WORKERS, pin_memory=True, collate_fn=collate_fn)
     global total_iter
     total_iter = float(int(CONFIG.SOLVER.EPOCHS * len(train_data) / CONFIG.DATALOADER.BATCH_SIZE.TRAIN))
     print("Dataset Ready.")
 
-    target_model = nn.DataParallel(VQA_Model(train_data.embedding_tokens).cuda())
+    target_model = nn.DataParallel(VQA_Model(train_data.num_tokens, CONFIG.DATASET.VOCAB_NUM).cuda())
     #optimizer = torch.optim.SGD(seg_model.parameters(), lr=CONFIG.SOLVER.INITIAL_LR, momentum=CONFIG.SOLVER.MOMENTUM, 
      #                           weight_decay=CONFIG.SOLVER.WEIGHT_DECAY, nesterov=True)
     optimizer = torch.optim.Adam(target_model.parameters())
@@ -42,8 +42,8 @@ def main(device):
     print("Model Ready.")
 
     for epoch in range(CONFIG.SOLVER.EPOCHS):
-        Epoch_Step(seg_model, train_loader, optimizer, epoch, recorder)
-        Epoch_Step(seg_model, val_loader, optimizer, epoch, recorder, Train=False)
+        Epoch_Step(target_model, train_loader, optimizer, epoch, recorder)
+        Epoch_Step(target_model, val_loader, optimizer, epoch, recorder, Train=False)
 
         name = "Epoch_{:d}".format(epoch)
         results = {
@@ -63,14 +63,14 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
     loss_window = window()
     acc_window = window()
     fmt = '{:.4f}'.format
-    log_softmax = nn.LogSoftmax().cuda()
+    log_softmax = nn.LogSoftmax(dim=1).cuda()
     tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
     np.seterr(divide='ignore', invalid='ignore')
 
     for qlen, q, a, v, l, item in tloader:
-        qlen = qlen.to(device='cuda', dtype=torch.long)
-        q = q.to(device='cuda', dtype=torch.long)
-        a = a.to(device='cuda', dtype=torch.long)
+        qlen = qlen.cuda()
+        q = q.cuda()
+        a = a.cuda()
         v = v.cuda()
         l = l.cuda()
 
@@ -80,7 +80,7 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
         acc = check_accuracy(score.detach(), a)
 
         loss_window.update(loss.detach().cpu().numpy())
-        acc_window.update(loss.mean().detach().cpu().numpy())
+        acc_window.update(acc.mean().detach().cpu().numpy())
 
         optimizer.zero_grad()
         loss.backward()
@@ -111,6 +111,10 @@ def check_accuracy(predict, real):
     current_num = real.gather(dim=1, index=index)
     return (current_num * 0.3).clamp(max=1)
 
+def collate_fn(batch):
+    batch.sort(key = lambda x: x[0], reverse = True)
+    return torch.utils.data.dataloader.default_collate(batch)
+
 class window:
 
     def __init__(self):
@@ -125,3 +129,5 @@ class window:
     def value(self):
         return self.sum / self.iter_num
 
+if __name__ == "__main__":
+    main()
