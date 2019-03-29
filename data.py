@@ -149,14 +149,13 @@ class VQA(data.Dataset):
             name = 'train_image'
         else:
             name = 'val_image'
-        # if not hasattr(self, 'features_file'):
-        #     self.features_file = h5py.File(self.image_feature_path, 'r')
-        with h5.File(self.image_feature_path, libver='latest') as features_file:
-            index = self.COCOid_to_index[COCOid]
-            data1 = features_file[name+'_feature']
-            img = data1[index].astype('float32')
-            data2 = features_file[name+'_semantic']
-            label = data2[index].astype('float32')
+        if not hasattr(self, 'features_file'):
+            self.features_file = h5py.File(self.image_feature_path, 'r')
+        index = self.COCOid_to_index[COCOid]
+        data1 = self.features_file[name+'_feature']
+        img = data1[index].astype('float32')
+        data2 = self.features_file[name+'_semantic']
+        label = data2[index].astype('float32')
         return torch.from_numpy(img), torch.from_numpy(label)
 
     def __getitem__(self, item):
