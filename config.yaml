@@ -25,10 +25,10 @@ VQA:
     VQA: ../dataset/VQAv1
     COCO_PROCESSED: dataset/image_processed.h5
     VOCAB: dataset/vocab.json
-    VOCAB_NUM: 4000
+    VOCAB_NUM: 3000
 
   DATALOADER:
-    WORKERS: 12
+    WORKERS: 4
     BATCH_SIZE:
       TRAIN: 128
       TEST: 200

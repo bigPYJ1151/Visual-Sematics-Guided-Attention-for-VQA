@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 import numpy as np
 from data import VQA
 from model.VQA import VQA_Model
+from model.BiSe_res18 import BiSeNet
+from model.ResNet152 import ResNet152
 import yaml
 import os
 import click
@@ -12,6 +14,7 @@ from addict import Dict
 from tqdm import tqdm
 
 CONFIG = Dict(yaml.load(open('config.yaml'))['VQA'])
+CONFIG_Bi = Dict(yaml.load(open('config.yaml'))['BISENET'])
 total_iter = 0
 current_iter = 0
 
@@ -33,7 +36,11 @@ def main(device):
     total_iter = float(int(CONFIG.SOLVER.EPOCHS * len(train_data) / CONFIG.DATALOADER.BATCH_SIZE.TRAIN))
     print("Dataset Ready.")
 
-    target_model = nn.DataParallel(VQA_Model(train_data.num_tokens, CONFIG.DATASET.VOCAB_NUM).cuda())
+    target_model = nn.DataParallel(VQA_Model(train_data.num_tokens, CONFIG.DATASET.VOCAB_NUM, CONFIG_Bi.DATASET.CLASS_NUM).cuda())
+    bise_model = nn.DataParallel(BiSeNet(CONFIG_Bi.DATASET.CLASS_NUM, CONFIG_Bi.DATASET.IGNORE_LABEL).cuda())
+    bise_state = torch.load(os.path.join('model', CONFIG.MODEL.BISENET))
+    bise_model.load_state_dict(bise_state['model'])
+    resnet = nn.DataParallel(ResNet152().cuda())
     #optimizer = torch.optim.SGD(seg_model.parameters(), lr=CONFIG.SOLVER.INITIAL_LR, momentum=CONFIG.SOLVER.MOMENTUM, 
      #                           weight_decay=CONFIG.SOLVER.WEIGHT_DECAY, nesterov=True)
     optimizer = torch.optim.Adam(target_model.parameters())
@@ -42,17 +49,17 @@ def main(device):
     print("Model Ready.")
 
     for epoch in range(CONFIG.SOLVER.EPOCHS):
-        Epoch_Step(target_model, train_loader, optimizer, epoch, recorder)
-        Epoch_Step(target_model, val_loader, optimizer, epoch, recorder, Train=False)
+        Epoch_Step(target_model, bise_model, ResNet152, train_loader, optimizer, epoch, recorder)
+        Epoch_Step(target_model, bise_model, ResNet152, val_loader, optimizer, epoch, recorder, Train=False)
 
         name = "Epoch_{:d}".format(epoch)
         results = {
-            'model':seg_model.state_dict(),
+            'model':target_model.state_dict(),
             'recorder':recorder
         }
         torch.save(results, os.path.join(CONFIG.SOLVER.SAVE_PATH, 'VQA_{}.pth'.format(name)))
 
-def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
+def Epoch_Step(target_model, seg_model, res_model, loader, optimizer, epoch, recorder, Train=True):
     if Train:
         target_model.train()
         mode = 'Train'
@@ -60,6 +67,8 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
         target_model.eval()
         mode = 'Val'
 
+    seg_model.eval()
+    res_model.eval()
     loss_window = window()
     acc_window = window()
     fmt = '{:.4f}'.format
@@ -67,14 +76,16 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
     tloader = tqdm(loader, desc='{}_Epoch:{:03d}'.format(mode, epoch), ncols=0)
     np.seterr(divide='ignore', invalid='ignore')
 
-    for qlen, q, a, v, l, item in tloader:
+    for qlen, q, a, v, item in tloader:
         qlen = qlen.cuda()
         q = q.cuda()
         a = a.cuda()
         v = v.cuda()
-        l = l.cuda()
+        with torch.no_grad():
+            l = seg_model(v.detach())
+            v = res_model(v.detach())
 
-        score = target_model(v, l, q, qlen)
+        score = target_model(v.detach(), l.detach(), q, qlen)
         soft = -log_softmax(score)
         loss = (soft * a / 10).sum(dim=1).mean()
         acc = check_accuracy(score.detach(), a)
@@ -82,13 +93,12 @@ def Epoch_Step(target_model, loader, optimizer, epoch, recorder, Train=True):
         loss_window.update(loss.detach().cpu().numpy())
         acc_window.update(acc.mean().detach().cpu().numpy())
 
-        optimizer.zero_grad()
-        loss.backward()
-
         if Train:
             global current_iter
-            lr_update1(optimizer)
+            lr_update2(optimizer)
             current_iter += 1
+            optimizer.zero_grad()
+            loss.backward()
             optimizer.step()
 
         tloader.set_postfix(loss=fmt(loss_window.value), acc=fmt(acc_window.value))

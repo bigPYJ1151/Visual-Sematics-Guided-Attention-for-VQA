@@ -56,9 +56,6 @@ class VQA(data.Dataset):
 
         self.image_feature_path = processed_COCO_path
         self.COCOid_to_filename = self._get_COCOid_to_filename()
-
-        if self.mode != 2:
-            self.COCOid_to_index = self._create_COCO_to_index() #mapping COCO id to h5py file image features index
         
         self.COCOids = [q['image_id'] for q in question_json['questions']]
 
@@ -161,18 +158,17 @@ class VQA(data.Dataset):
     def __getitem__(self, item):
         q, qlen = self.questions[item]
         image_id = self.COCOids[item]
+        filename = self.COCOid_to_filename[image_id]
+        v = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR)
+        v = cv2.resize(v, (448, 448), interpolation=cv2.INTER_LINEAR)
+        v = v[:, :, ::-1] #bgr to rgb
+        v = self.transform(v.copy())
 
         if self.mode in [0, 1]:
             a = self.answers[item]
-            v, l = self._get_image_feature(image_id)
-            return qlen, q, a, v, l, item
+            return qlen, q, a, v, item
         
         else:
-            filename = self.COCOid_to_filename[image_id]
-            v = cv2.imread(os.path.join(self.image_path, filename), cv2.IMREAD_COLOR)
-            v = cv2.resize(v, (448, 448), interpolation=cv2.INTER_LINEAR)
-            v = v[:, :, ::-1] #bgr to rgb
-            v = self.transform(v.copy())
             return qlen, q, v, item
         
     def __len__(self):

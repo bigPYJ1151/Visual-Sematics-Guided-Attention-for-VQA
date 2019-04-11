@@ -1,18 +1,16 @@
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 class VQA_Model(nn.Module):
-    def __init__(self, embedding_tokens, answer_num, question_encode_length = 1024, num_attention_map = 2):
+    def __init__(self, embedding_tokens, answer_num, label_length, question_encode_length = 1024, num_attention_map = 2):
         super().__init__()
         image_feature_length = 2048
-        semantic_feature_length = 182
 
         self.Text_encoder = Text_encoder(embedding_tokens, question_encode_length)
-        self.Attention = Stacked_attention(image_feature_length, semantic_feature_length, question_encode_length, num_attention_map)
-        self.pool = nn.AdaptiveMaxPool2d(1)
-
-        in_len = num_attention_map * image_feature_length + question_encode_length + semantic_feature_length
+        self.Attention = Stacked_attention(image_feature_length, label_length, question_encode_length, num_attention_map)
+        
+        in_len = num_attention_map * image_feature_length + question_encode_length
         self.Classifer = Classifer(in_len, answer_num)
 
         self.Attention_Map = None
@@ -23,9 +21,8 @@ class VQA_Model(nn.Module):
         v = nn.functional.normalize(v, dim=1)
         l = nn.functional.normalize(l, dim=1)
         feature, self.Attention_Map = self.Attention(encode_q, v, l)
-        l = self.pool(l).squeeze()
-
-        feature = torch.cat([feature, encode_q, l], dim=1)
+        
+        feature = torch.cat([feature, encode_q], dim=1)
         out = self.Classifer(feature)
 
         return out
@@ -45,21 +42,24 @@ class Classifer(nn.Module):
         return out
 
 class Stacked_attention(nn.Module):
-    def __init__(self, image_feature_length, semantic_feature_length, question_encode_length, num_attention_map):
+    def __init__(self, image_feature_length, label_length, question_encode_length, num_attention_map):
         super().__init__()
-        self.conv1 = nn.Conv2d(image_feature_length + semantic_feature_length,
-                                512, 1, bias=False)
-        self.lin1 = nn.Linear(question_encode_length, 512)
+        self.conv = nn.Conv2d(label_length,
+                                question_encode_length, 1, bias=True)
+        self.lin = nn.Linear(question_encode_length, question_encode_length, bias=True)
+        self.tanh = nn.Tanh()
         self.relu = nn.ReLU(inplace=True)
 
+        self.conv1 = nn.Conv2d(question_encode_length + image_feature_length, 512, 1)
         self.conv2 = nn.Conv2d(512, num_attention_map, 1)
         self.dropout = nn.Dropout(p=0.5, inplace=False)
 
     def forward(self, q, v, l):
-        q1 = self.lin1(self.dropout(q))
-        v1 = self.conv1(self.dropout(torch.cat([v, l], dim=1)))
-        q1 = self._vec_expand(q1, v1)
-        fused = self.relu(v1 + q1)
+        q1 = self.tanh(self.lin(q))
+        l1 = self.tanh(self.conv(l))
+        q1 = self._vec_expand(q1, l1)
+        f = q1 * l1
+        fused = self.conv1(torch.cat([f, v], dim=1))
         attention_map = self.conv2(self.dropout(fused))
         
         n, c = v.size()[:2]
