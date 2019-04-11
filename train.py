@@ -40,6 +40,7 @@ def main(device):
     bise_model = nn.DataParallel(BiSeNet(CONFIG_Bi.DATASET.CLASS_NUM, CONFIG_Bi.DATASET.IGNORE_LABEL).cuda())
     bise_state = torch.load(os.path.join('model', CONFIG.MODEL.BISENET))
     bise_model.load_state_dict(bise_state['model'])
+    pool = nn.DataParallel(nn.AdaptiveMaxPool2d(14).cuda())
     resnet = nn.DataParallel(ResNet152().cuda())
     #optimizer = torch.optim.SGD(seg_model.parameters(), lr=CONFIG.SOLVER.INITIAL_LR, momentum=CONFIG.SOLVER.MOMENTUM, 
      #                           weight_decay=CONFIG.SOLVER.WEIGHT_DECAY, nesterov=True)
@@ -49,8 +50,8 @@ def main(device):
     print("Model Ready.")
 
     for epoch in range(CONFIG.SOLVER.EPOCHS):
-        Epoch_Step(target_model, bise_model, ResNet152, train_loader, optimizer, epoch, recorder)
-        Epoch_Step(target_model, bise_model, ResNet152, val_loader, optimizer, epoch, recorder, Train=False)
+        Epoch_Step(target_model, bise_model, pool, resnet, train_loader, optimizer, epoch, recorder)
+        Epoch_Step(target_model, bise_model, pool, resnet, val_loader, optimizer, epoch, recorder, Train=False)
 
         name = "Epoch_{:d}".format(epoch)
         results = {
@@ -59,7 +60,7 @@ def main(device):
         }
         torch.save(results, os.path.join(CONFIG.SOLVER.SAVE_PATH, 'VQA_{}.pth'.format(name)))
 
-def Epoch_Step(target_model, seg_model, res_model, loader, optimizer, epoch, recorder, Train=True):
+def Epoch_Step(target_model, seg_model, pool, res_model, loader, optimizer, epoch, recorder, Train=True):
     if Train:
         target_model.train()
         mode = 'Train'
@@ -82,7 +83,7 @@ def Epoch_Step(target_model, seg_model, res_model, loader, optimizer, epoch, rec
         a = a.cuda()
         v = v.cuda()
         with torch.no_grad():
-            l = seg_model(v.detach())
+            l = pool(seg_model(v.detach()))
             v = res_model(v.detach())
 
         score = target_model(v.detach(), l.detach(), q, qlen)
