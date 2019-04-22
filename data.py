@@ -58,7 +58,8 @@ class VQA(data.Dataset):
         self.COCOid_to_filename = self._get_COCOid_to_filename()
         
         self.COCOids = [q['image_id'] for q in question_json['questions']]
-
+        self.questionids = [q['question_id'] for q in question_json['questions']]
+        
         self.transform = transforms.Compose([
                 transforms.ToTensor(), #to tensor and normalize to [0,1]
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],

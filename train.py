@@ -85,15 +85,21 @@ def Epoch_Step(target_model, seg_model, pool, res_model, loader, optimizer, epoc
         with torch.no_grad():
             l = pool(seg_model(v.detach()))
             v = res_model(v.detach())
-
-        score = target_model(v.detach(), l.detach(), q, qlen)
-        soft = -log_softmax(score)
-        loss = (soft * a / 10).sum(dim=1).mean()
-        acc = check_accuracy(score.detach(), a)
+        if Train:
+            score = target_model(v.detach(), l.detach(), q, qlen)
+            soft = -log_softmax(score)
+            loss = (soft * a / 10).sum(dim=1).mean()
+            acc = check_accuracy(score.detach(), a)
+        else:
+            with torch.no_grad():
+                score = target_model(v.detach(), l.detach(), q, qlen)
+                soft = -log_softmax(score)
+                loss = (soft * a / 10).sum(dim=1).mean()
+                acc = check_accuracy(score.detach(), a)    
 
         loss_window.update(loss.detach().cpu().numpy())
         acc_window.update(acc.mean().detach().cpu().numpy())
-
+        
         if Train:
             global current_iter
             lr_update2(optimizer)
@@ -113,7 +119,7 @@ def lr_update1(optimizer):
         param_group['lr'] = lr
 
 def lr_update2(optimizer):
-    lr = CONFIG.SOLVER.INITIAL_LR * 0.5 ** (float(current_iter)/(total_iter))
+    lr = CONFIG.SOLVER.INITIAL_LR * 0.5 ** (float(current_iter)/(50000.0))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 

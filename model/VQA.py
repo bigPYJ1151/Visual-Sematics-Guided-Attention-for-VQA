@@ -59,7 +59,7 @@ class Stacked_attention(nn.Module):
         l1 = self.tanh(self.conv(l))
         q1 = self._vec_expand(q1, l1)
         f = q1 * l1
-        fused = self.conv1(torch.cat([f, v], dim=1))
+        fused = self.relu(self.conv1(torch.cat([self.dropout(f), self.dropout(v)], dim=1)))
         attention_map = self.conv2(self.dropout(fused))
         
         n, c = v.size()[:2]
